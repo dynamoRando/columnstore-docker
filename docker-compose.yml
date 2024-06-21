@@ -1,0 +1,154 @@
+services:
+  mcs1:
+    container_name: mcs1
+    hostname: mcs1
+    image: mariadb/columnstore
+    ports:
+      - 3307:3306
+    environment:
+      - PM1=mcs1
+
+  kafka:
+    container_name: kafka
+    command:
+      - sh
+      - -c
+      - |
+        export CLUSTER_ID=$$(kafka-storage random-uuid) && \
+        kafka-storage format -t $$CLUSTER_ID -c /etc/kafka/kraft/server.properties && \
+        kafka-server-start /etc/kafka/kraft/server.properties \
+          --override advertised.listeners=$${KAFKA_ADVERTISED_LISTENERS} \
+          --override listener.security.protocol.map=$${KAFKA_LISTENER_SECURITY_PROTOCOL_MAP} \
+          --override listeners=$${KAFKA_LISTENERS}
+    environment:
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://127.0.0.1:29092
+      KAFKA_LISTENERS: PLAINTEXT://:9092,PLAINTEXT_HOST://:29092,CONTROLLER://:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,CONTROLLER:PLAINTEXT
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "kafka-topics",
+          "--list",
+          "--bootstrap-server=kafka:9092"
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 5s
+    image: confluentinc/cp-kafka:7.5.1
+    networks:
+      - default
+    ports:
+      - 29092:29092
+
+  kui:
+    container_name: kui
+    depends_on:
+      kafka:
+        condition: service_healthy
+      schema-registry:
+        condition: service_healthy
+    environment:
+      DYNAMIC_CONFIG_ENABLED: 'true'
+      JAVA_OPTS: "-Xms256m -Xmx256m"
+      KAFKA_CLUSTERS_0_NAME: 'local'
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: 'kafka:9092'
+      KAFKA_CLUSTERS_0_SCHEMAREGISTRY: 'http://schema-registry:8081'
+      KAFKA_CLUSTERS_0_KAFKACONNECT_0_ADDRESS: 'http://kafka-connect:8083'
+      KAFKA_CLUSTERS_0_KAFKACONNECT_0_NAME: 'kafka-connect'
+    image: provectuslabs/kafka-ui:latest
+    ports:
+      - 8099:8080
+
+  mysql:
+    container_name: mysql
+    image: mysql:8.0
+    cap_add:
+      - SYS_NICE
+    environment:
+      - MYSQL_USER=database
+      - MYSQL_PASSWORD=password
+      - MYSQL_DATABASE=test
+      - MYSQL_ROOT_PASSWORD=password
+    ports:
+      - 3306:3306
+
+  schema-registry:
+    container_name: schema-registry
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://kafka:9092
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8081" ]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    image: confluentinc/cp-schema-registry:7.5.1
+    networks:
+      - default
+    ports:
+      - 8081:8081
+
+  kafka-connect:
+      image: confluentinc/cp-kafka-connect-base:latest
+      container_name: kafka-connect
+      depends_on:
+        - kafka
+        - schema-registry
+      ports:
+        - 8083:8083
+      environment:
+        CONNECT_BOOTSTRAP_SERVERS: kafka:9092
+        CONNECT_REST_PORT: 8083
+        CONNECT_GROUP_ID: kafka-connect
+        CONNECT_CONFIG_STORAGE_TOPIC: _connect-configs
+        CONNECT_OFFSET_STORAGE_TOPIC: _connect-offsets
+        CONNECT_STATUS_STORAGE_TOPIC: _connect-status
+        CONNECT_KEY_CONVERTER: org.apache.kafka.connect.storage.StringConverter
+        CONNECT_KEY_CONVERTER_SCHEMA_REGISTRY_URL: 'http://schema-registry:8081'
+        CONNECT_VALUE_CONVERTER: io.confluent.connect.avro.AvroConverter
+        CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL: 'http://schema-registry:8081'
+        CONNECT_REST_ADVERTISED_HOST_NAME: "kafka-connect"
+        CONNECT_LOG4J_APPENDER_STDOUT_LAYOUT_CONVERSIONPATTERN: "[%d] %p %X{connector.context}%m (%c:%L)%n"
+        CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: "1"
+        CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: "1"
+        CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: "1"
+        #  ---------------
+        CONNECT_PLUGIN_PATH: /usr/share/java,/usr/share/confluent-hub-components,/data/connect-jars
+      # If you want to use the Confluent Hub installer to d/l component, but make them available
+      # when running this offline, spin up the stack once and then run : 
+      #   docker cp kafka-connect:/usr/share/confluent-hub-components ./data/connect-jars
+      volumes:
+        - $PWD/data:/data
+      # In the command section, $ are replaced with $$ to avoid the error 'Invalid interpolation format for "command" option'
+      # To make the kafka-connect-jdbc connector work with MySQL we also have to download the JAR for the drivers for MySQL 
+      # And place it in the location of confluent hub _AFTER_ it has been installed
+      command:
+        - bash
+        - -c
+        - |
+          echo "Installing Connector"
+          confluent-hub install --no-prompt debezium/debezium-connector-mysql:1.7.0
+          confluent-hub install --no-prompt confluentinc/kafka-connect-jdbc:latest
+          #
+          echo "Get MySQL drivers"
+          curl -o /usr/share/confluent-hub-components/confluentinc-kafka-connect-jdbc/lib/mysql.jar https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.30/mysql-connector-java-8.0.30.jar
+          echo "Get MariaDB drivers"
+          cp /data/maria.jar /usr/share/confluent-hub-components/confluentinc-kafka-connect-jdbc/lib/maria.jar 
+          #
+          echo "Launching Kafka Connect worker"
+          /etc/confluent/docker/run &
+          #
+          sleep infinity
+
+  metabase-arm:
+    container_name: metabase
+    build:
+      context: .
+    ports: 
+      - 3000:3000

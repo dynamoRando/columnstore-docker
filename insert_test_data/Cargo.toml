@@ -1,0 +1,10 @@
+[package]
+name = "insert_test_data"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.86"
+chrono = "0.4.38"
+mysql = "25.0.1"
+rand = "0.8.5"
