@@ -152,3 +152,10 @@ services:
       context: .
     ports: 
       - 3000:3000
+  
+  clickhouse:
+    container_name: clickhouse
+    image: clickhouse/clickhouse-server:latest
+    ports:
+      - 18123:8123 
+      - 19000:9000
