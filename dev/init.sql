@@ -43,3 +43,10 @@ CREATE DATABASE analytics;
 
 CREATE TABLE
     IF NOT EXISTS analytics.posts (post_id INT, poster_id INT, post_ts datetime) ENGINE = ColumnStore;
+
+-- this database is for bulk loading, rather than trying to move data via Kafka
+
+CREATE DATABASE dw;
+
+CREATE TABLE
+    IF NOT EXISTS dw.posts (post_id INT, poster_id INT, post_ts datetime) ENGINE = ColumnStore;

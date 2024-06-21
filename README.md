@@ -116,3 +116,50 @@ analytics-posts
 # Observations
 
 MariaDB ColumnStore is not optimized for writes, so it lags behind when there is a ton of data to insert. It is preferable to do INSERTs in batches. This becomes obvious over time if you look in Kafka UI for the consumer groups the lag for the analytics database.
+
+In the `init.sql` file, there is another database named `dw` that you can create. To load data into that database, you can simply write an INSERT INTO SELECT statement; as in:
+
+```
+INSERT INTO dw.posts SELECT * FROM test.posts;
+```
+
+which basically is loading data from your operational data store into your data warehouse.
+
+You may also want to look at the MariaDB ColumnStore documentation for importing data:
+
+- https://mariadb.com/kb/en/columnstore-bulk-data-loading/
+- https://mariadb.com/kb/en/columnstore-batch-insert-mode/
+
+Where you can set `set infinidb_use_import_for_batchinsert = (0|1)` for batch insertions.
+
+On my local machine, loading this way directly from the ODS (the `test` database in the `mcs` container) to DW was much faster than waiting for Kafka to keep the `analytics` database up to date with the source `test` database.
+
+Running a query such as:
+
+```
+select
+	poster_id,
+	year(post_ts) post_year,
+	count(*) num_posts
+from 
+	test.posts
+group by 
+	poster_id,
+	year(post_ts);
+```
+
+versus 
+
+```
+select
+	poster_id,
+	year(post_ts) post_year,
+	count(*) num_posts
+from 
+	dw.posts
+group by 
+	poster_id,
+	year(post_ts);
+```
+
+was also faster.
