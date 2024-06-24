@@ -2,6 +2,12 @@
 
 This docker-compose example is for showing how to take data from an OLTP system (MySQL) and load it into a columnar database (MariaDB ColumnStore). There isn't anything revolutionary with this repo, it's just here to prove that you can connect between MySQL and MariaDB CS via Kafka. And that MariaDB ColumnStore works with Metabase for SQL queries.
 
+# metabase
+
+The metabase Dockerfile is for manually building the metabase container.
+
+You may need to manually curl the `metabase.jar` file and place it in the `metabase/` directory in order to build it.
+
 # mcs1 (data warehouse)
 
 This is MariaDB ColumnStore.
@@ -111,6 +117,68 @@ analytics-posts
     "value.converter": "io.confluent.connect.avro.AvroConverter",
     "value.converter.schema.registry.url": "http://schema-registry:8081"
 }
+```
+
+clickhouse-posts
+
+```
+{
+    "connector.class": "com.clickhouse.kafka.connect.ClickHouseSinkConnector",
+    "tasks.max": "1",
+    "name": "clickhouse-posts",
+    "topics": "test.test.posts",
+    "ssl": "false",
+    "hostname": "clickhouse",
+    "database": "test",
+    "password": "",
+    "port": "8123",
+    "value.converter.schemas.enable": "true",
+    "value.converter": "io.confluent.connect.avro.AvroConverter",
+    "value.converter.schema.registry.url": "http://schema-registry:8081",
+    "key.converter.schema.registry.url": "http://schema-registry:8081",
+    "key.converter.schemas.enable": "true",
+    "key.converter": "io.confluent.connect.avro.AvroConverter",
+    "exactlyOnce": "true",
+    "username": "default",
+    "schemas.enable": "false",
+    "topic2TableMap": "test.test.posts=posts",
+    "transforms": "unwrap, convertTS",
+    "transforms.unwrap.type": "io.debezium.transforms.ExtractNewRecordState",
+    "transforms.convertTS.type": "org.apache.kafka.connect.transforms.TimestampConverter$Value",
+    "transforms.convertTS.field": "post_ts",
+    "transforms.convertTS.target.type": "Timestamp"
+}
+```
+
+To validate:
+
+```
+ curl -X PUT http://localhost:8083/connector-plugins/com.clickhouse.kafka.connect.ClickHouseSinkConnector/config/validate -H "Content-Type: application/json" -d '{
+    "connector.class": "com.clickhouse.kafka.connect.ClickHouseSinkConnector",
+    "tasks.max": "1",
+    "name": "clickhouse-posts",
+    "topics": "test.test.posts",
+    "ssl": "false",
+    "hostname": "clickhouse",
+    "database": "test",
+    "password": "",
+    "port": "8123",
+    "value.converter.schemas.enable": "true",
+    "value.converter": "io.confluent.connect.avro.AvroConverter",
+    "value.converter.schema.registry.url": "http://schema-registry:8081",
+    "key.converter.schema.registry.url": "http://schema-registry:8081",
+    "key.converter.schemas.enable": "true",
+    "key.converter": "io.confluent.connect.avro.AvroConverter",
+    "exactlyOnce": "true",
+    "username": "default",
+    "schemas.enable": "false",
+    "topic2TableMap": "test.test.posts=posts",
+    "transforms": "unwrap, convertTS",
+    "transforms.unwrap.type": "io.debezium.transforms.ExtractNewRecordState",
+    "transforms.convertTS.type": "org.apache.kafka.connect.transforms.TimestampConverter$Value",
+    "transforms.convertTS.field": "post_ts",
+    "transforms.convertTS.target.type": "Timestamp"
+}';
 ```
 
 # Observations

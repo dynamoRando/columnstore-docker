@@ -22,7 +22,7 @@ fn main() -> Result<()> {
     // let num_posts = 3;
 
     // note that you can go higher here, but it will take MariaDB CS time to catch up
-    let num_posts = 1_500_000;
+    let num_posts = 50_000;
 
     for post_id in 1..num_posts {
         let post = get_post(post_id);

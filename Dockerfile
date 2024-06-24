@@ -4,6 +4,7 @@ ENV FC_LANG en-US LC_CTYPE en_US.UTF-8
 
 WORKDIR /app/
 
+# you'll need to manually curl the jar file on your machine
 COPY metabase/metabase.jar . 
 COPY metabase/run_metabase.sh .
 

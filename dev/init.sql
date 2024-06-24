@@ -50,3 +50,16 @@ CREATE DATABASE dw;
 
 CREATE TABLE
     IF NOT EXISTS dw.posts (post_id INT, poster_id INT, post_ts datetime) ENGINE = ColumnStore;
+
+-- This is for ClickHouse
+
+CREATE DATABASE test;
+
+CREATE TABLE test.posts
+(
+    post_id Int32,
+    poster_id Int32,
+    post_ts DateTime
+)
+ENGINE = MergeTree
+ORDER BY post_id;
