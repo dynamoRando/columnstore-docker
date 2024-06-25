@@ -135,6 +135,7 @@ services:
           echo "Installing Connector"
           confluent-hub install --no-prompt debezium/debezium-connector-mysql:1.7.0
           confluent-hub install --no-prompt confluentinc/kafka-connect-jdbc:latest
+          confluent-hub install --no-prompt clickhouse/clickhouse-kafka-connect:latest
           #
           echo "Get MySQL drivers"
           curl -o /usr/share/confluent-hub-components/confluentinc-kafka-connect-jdbc/lib/mysql.jar https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.30/mysql-connector-java-8.0.30.jar
@@ -152,3 +153,27 @@ services:
       context: .
     ports: 
       - 3000:3000
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    user: '101:101'
+    container_name: clickhouse
+    hostname: clickhouse
+    volumes:
+      - ${PWD}/fs/volumes/clickhouse/etc/clickhouse-server/config.d/config.xml:/etc/clickhouse-server/config.d/config.xml
+      - ${PWD}/fs/volumes/clickhouse/etc/clickhouse-server/users.d/users.xml:/etc/clickhouse-server/users.d/users.xml
+    ports:
+      - 18123:8123
+      - 19000:9000
+    depends_on:
+      - clickhouse-keeper
+    
+  clickhouse-keeper:
+    image: clickhouse/clickhouse-keeper:latest-alpine
+    user: '101:101'
+    container_name: clickhouse-keeper
+    hostname: clickhouse-keeper
+    volumes:
+      - ${PWD}/fs/volumes/clickhouse-keeper/etc/clickhouse-keeper/keeper_config.xml:/etc/clickhouse-keeper/keeper_config.xml
+    ports:
+      - 19181:9181
