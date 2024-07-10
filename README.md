@@ -1,10 +1,10 @@
 # Overview
 
-This docker-compose example is for showing how to take data from an OLTP system (MySQL) and load it into a columnar database (MariaDB ColumnStore). There isn't anything revolutionary with this repo, it's just here to prove that you can connect between MySQL and MariaDB CS via Kafka. And that MariaDB ColumnStore works with Metabase for SQL queries.
+This docker-compose example is for showing how to take data from an OLTP system (MySQL) and load it into a columnar database (MariaDB ColumnStore and/or Clickhouse). There isn't anything revolutionary with this repo, it's just here to prove that you can connect between MySQL and MariaDB CS or Clickhouse via Kafka. And that MariaDB ColumnStore works with Metabase for SQL queries.
 
 # metabase
 
-The metabase Dockerfile is for manually building the metabase container.
+The metabase Dockerfile is for manually building the metabase container. I needed this to run metabase docker on an Apple Silicon machine.
 
 You may need to manually curl the `metabase.jar` file and place it in the `metabase/` directory in order to build it.
 
@@ -25,7 +25,9 @@ docker exec -it mcs1 provision mcs1
 | UserName | admin        |
 | Password | C0lumnStore! |
 
+# insert_test_data
 
+This is a simple Rust console application that just generate a bunch of data (test posts) to insert into MySQL.
 
 # DBZ Config 
 
@@ -118,6 +120,8 @@ analytics-posts
     "value.converter.schema.registry.url": "http://schema-registry:8081"
 }
 ```
+
+This is for connecting Clickhouse to Kafka as a sink for the `posts` topic.
 
 clickhouse-posts
 
@@ -231,3 +235,5 @@ group by
 ```
 
 was also faster.
+
+Using Clickhouse data seemed to load much faster.
